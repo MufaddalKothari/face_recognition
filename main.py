@@ -6,19 +6,27 @@ import numpy as np
 import faiss
 import insightface
 from multiprocessing import Pool, cpu_count
+import sys
+import os
+
+def get_resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
 
 # -------------------------
 # GLOBAL (per worker)
 # -------------------------
 face_app = None
 
-
 # -------------------------
 # WORKER INIT
 # -------------------------
 def init_worker():
     global face_app
-    face_app = insightface.app.FaceAnalysis(name="buffalo_l")
+    model_path = get_resource_path('.')
+    face_app = insightface.app.FaceAnalysis(providers=['CPUExecutionProvider'], root=model_path, name="buffalo_l")
     face_app.prepare(ctx_id=0)
 
 
@@ -36,7 +44,11 @@ def process_batch(paths):
             img = cv2.imread(path)
             if img is None:
                 continue
-
+            h, w = img.shape[:2]
+            max_dim = 1280 # 720p/1080p equivalent is plenty for faces
+            if max(h, w) > max_dim:
+                scale = max_dim / max(h, w)
+                img = cv2.resize(img, (int(w * scale), int(h * scale)))
             faces = face_app.get(img)
 
             for face in faces:
@@ -52,6 +64,7 @@ def process_batch(paths):
     return embeddings, metadata, len(paths)
 
 
+
 # -------------------------
 # ENGINE
 # -------------------------
@@ -65,7 +78,8 @@ class FaceSearchEngine:
     def preload_model(self):
         if self.face_app is None:
             print("Preloading model...")
-            self.face_app = insightface.app.FaceAnalysis(name="buffalo_l")
+            model_path = get_resource_path('.')
+            self.face_app = insightface.app.FaceAnalysis(providers=['CPUExecutionProvider'], root=model_path, name="buffalo_l")
             self.face_app.prepare(ctx_id=0)
             print("Model ready")
 
