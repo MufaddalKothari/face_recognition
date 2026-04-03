@@ -7,7 +7,10 @@ import platform
 import subprocess
 import cv2
 from PIL import Image
-from main import FaceSearchEngine
+from engine import FaceSearchEngine
+import multiprocessing
+
+os.environ['MPLCONFIGDIR'] = os.path.join(os.path.expanduser('~'), '.matplotlib_facesearch')
 
 # -------------------------
 # CONFIG
@@ -351,5 +354,6 @@ class App(ctk.CTk):
 # RUN
 # -------------------------
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
     app = App()
     app.mainloop()
