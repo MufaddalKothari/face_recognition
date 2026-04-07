@@ -8,6 +8,26 @@ import insightface
 from multiprocessing import Pool, cpu_count
 import sys
 import os
+import rawpy
+
+def read_image(path):
+    ext = path.lower().split('.')[-1]
+    print(f"[READ_IMAGE] {sys.path}")
+    # RAW formats
+    if ext in ["cr2", "nef", "arw", "dng"]:
+        try:
+            with rawpy.imread(path) as raw:
+                rgb = raw.postprocess()
+                print(f"[RAW DETECTED] {path}")
+            img = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+            del rgb  # free memory ASAP
+            return img
+        except:
+            print(f"[ERROR] Failed to read RAW image: {path}")
+            return None
+    else:
+        return cv2.imread(path)
+    
 
 def get_resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """
@@ -41,8 +61,10 @@ def process_batch(paths):
 
     for path in paths:
         try:
-            img = cv2.imread(path)
+            img = read_image(path)
+            print(f"Reading: {path}")
             if img is None:
+                print(path," : image not read.")
                 continue
             h, w = img.shape[:2]
             max_dim = 1280 # 720p/1080p equivalent is plenty for faces
@@ -57,7 +79,8 @@ def process_batch(paths):
                     "path": path,
                     "bbox": face.bbox.astype(int)
                 })
-
+            print(f"Processed: {path} ({len(faces)} faces)")
+            del img  # free memory ASAP
         except:
             continue
 
@@ -84,7 +107,7 @@ class FaceSearchEngine:
             print("Model ready")
 
     def get_all_images(self, folder):
-        exts = (".jpg", ".jpeg", ".png", ".webp")
+        exts = (".jpg", ".jpeg", ".png", ".webp", ".cr2", ".nef", ".arw", ".dng")
         paths = []
 
         for root, _, files in os.walk(folder):
@@ -107,6 +130,8 @@ class FaceSearchEngine:
 
         paths = self.get_all_images(folder)
         total = len(paths)
+        print(f"Total images found: {len(paths)}")
+        print("Sample paths:", paths[:5])
 
         if total == 0:
             return
@@ -152,7 +177,7 @@ class FaceSearchEngine:
 
         self.preload_model()
 
-        img = cv2.imread(query_path)
+        img = read_image(query_path)
         if img is None:
             return []
 
