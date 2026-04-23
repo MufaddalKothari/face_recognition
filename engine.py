@@ -208,7 +208,7 @@ class FaceSearchEngine:
 
             results.append({
                 "path": meta["path"],
-                "bbox": meta["bbox"],
+                "bbox": meta["bbox"].tolist(),
                 "score": float(score)
             })
 
